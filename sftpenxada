@@ -80,8 +80,9 @@ copyBackupAndUnzipFunction() {
     echo "Descompactando arquivo $backupFolder/${user}.zip, e em $folderTemp para ser enviado novamente ao servidor."
     sleep 3
     cp $backupFolder/${user}.zip $folderTemp
-    unzip -r ${user}.zip $folderTemp
-    rm $backupFolder/${user}.zip
+    cd $folderTemp
+    unzip ${user}.zip
+    rm ${user}.zip
     echo "Arquivo enviado para $backupFolder/${user}.zip, e descompactado iniciando transferência ao servidor."
     sleep 3
 
