@@ -4,112 +4,87 @@ folderTemp=~/.sftp-enxada/.temp/
 workingFolder=~/.sftp-enxada/
 backupFolder=~/.sftp-enxada/backup/
 
-    read -p "Digite o nome do usuário: " user
-    read -p "Digite o node de destino (Ex: br-arm-7): " host
+read -p "Digite o nome do usuário: " user
+read -p "Digite o node de destino (Ex: br-arm-7): " host
 
-initialSetupFunction() {
-
-    echo "Iniciando o setup inicial, o sistema de arquivos necessário será criado, uma pasta chamada .sftp-enxada será criada dentro do home do usuário."
-    mkdir $workingFolder
-    mkdir $folderTemp
-    mkdir $backupFolder
-    echo "Setup inicial concluído."
-
-    getPutFunction
+setup() {
+  echo "Iniciando o setup inicial, o sistema de arquivos necessário será criado, uma pasta chamada .sftp-enxada será criada dentro do home do usuário."
+  mkdir $workingFolder
+  mkdir $folderTemp
+  mkdir $backupFolder
+  echo "Setup inicial concluído."
 }
 
-getPutFunction() {
-
-    read -p "Escolha get para enviar, e put para receber arquivos do servidor (obs: o get irá compactar o arquivo, e o armazenaremos em $backupFolder, e o put irá descompactar o arquivo e o enviará ao servidor): " getPut
-
-if [[ "$getPut" == "get" ]]; then
-    rm -fr "$backupFolder*" 2>&1
-    connectSftpFunction
-    zipFileAndMoveFunction
-    exit 0
-
-elif [[ "$getPut" == "put" ]]; then
-    rm -fr "$backupFolder*" 2>&1
-    copyBackupAndUnzipFunction
-    connectSftpFunction
-    
-    exit 0
-
-else
-    
-        echo "Opção inválida"
-        getPutFunction
-    
-    fi
-}
-
-
-zipFileAndMoveFunction() {
-
-
+zipFileAndMove() {
   if [ -f "$backupFolder/$user.zip" ]; then
-
     read -p "O arquivo $user.zip já existe, deseja excluir-lo? (s/n): " removeFile
-    if [[ "$removeFile" == "s" ]]; then
-        rm $backupFolder/$user.zip
-        echo "Arquivo $user.zip excluído."
-    elif [[ "$removeFile" == "n" ]]; then
-        echo "Arquivo $user.zip não foi modificado, e nenhum backup foi realizado."
-        exit 0
-    else
-        echo "Opção inválida, utilize 's' para sim ou 'n' para não. (Case sensitive)"
-        zipFileAndMoveFunction
-    fi
-      
   fi
-  
 
-    echo "Os arquivos foram recebidos, tentando compactar em .zip, o arquivo criado irá se chamar: ${user}.zip, e será enviado para $backupFolder/${user}.zip"
-    sleep 3
-    cd "$folderTemp"
-    zip -r "${user}".zip ./*
-    mv "$folderTemp${user}.zip" "$backupFolder"
-    rm -r "$folderTemp*"
-    echo "Arquivo compactado e enviado para $backupFolder${user}.zip, finalizando..."
-    exit 1
+  if [ $removeFile == "s" ]; then
+    rm $backupFolder/$user.zip
+    echo "Arquivo $user.zip excluído."
+  elif [ $removeFile == "n" ]; then
+    echo "Arquivo $user.zip não foi modificado, e nenhum backup foi realizado."
+    exit 0
+  else
+    echo "Opção inválida, utilize 's' para sim ou 'n' para não. (Case sensitive)"
+    zipFileAndMove
+  fi
 
+  echo "Os arquivos foram recebidos, tentando compactar em .zip, o arquivo criado irá se chamar: ${user}.zip, e será enviado para $backupFolder/${user}.zip"
+  sleep 3
+  cd "$folderTemp"
+  zip -r "$user.zip" ./*
+  mv "$folderTemp$user.zip" "$backupFolder"
+  rm -r "$folderTemp*"
+  echo "Arquivo compactado e enviado para $backupFolder$user.zip, finalizando..."
+  exit 1
 }
 
-copyBackupAndUnzipFunction() {
-
-    echo "Descompactando arquivo $backupFolder/${user}.zip, e em $folderTemp para ser enviado novamente ao servidor."
-    sleep 3
-    cp $backupFolder/${user}.zip $folderTemp
-    unzip -r ${user}.zip $folderTemp
-    rm $backupFolder/${user}.zip
-    echo "Arquivo enviado para $backupFolder/${user}.zip, e descompactado iniciando transferência ao servidor."
-    sleep 3
-
+copyBackupAndUnzip() {
+  echo "Descompactando arquivo $backupFolder/${user}.zip, e em $folderTemp para ser enviado novamente ao servidor."
+  sleep 3
+  cp $backupFolder/${user}.zip $folderTemp
+  unzip -r ${user}.zip $folderTemp
+  rm $backupFolder/${user}.zip
+  echo "Arquivo enviado para $backupFolder/${user}.zip, e descompactado iniciando transferência ao servidor."
+  sleep 3
 }
 
 
-connectSftpFunction() {
-
-    if [[ "$getPut" == "get" ]]; then
-
+sftpJob() {
+  if [ $opt == "get" ]; then
     printf "%s\n" "get -r * ${folderTemp}" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
-
-    elif [[ "$getPut" == "put" ]]; then
-
+  elif [ $opt == "put" ]; then
     printf "%s\n" "put -r ${folderTemp}*" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
     rm -r "$folderTemp*"
-
-    fi
-
-
+  fi
 }
 
+main() {
+  read -p "Escolha get para enviar, e put para receber arquivos do servidor (obs: o get irá compactar o arquivo, e o armazenaremos em $backupFolder, e o put irá descompactar o arquivo e o enviará ao servidor): " opt
 
-if [[ -d "$workingFolder" ]] && [[ -d "$folderTemp" ]] && [[ -d "$backupFolder" ]]; then
+  if [ -d "$workingFolder" ] && [ -d "$folderTemp" ] && [ -d "$backupFolder" ]; then
     echo "As pastas de backup, temp, e .enxadahost já existem, não serão criadas novamente, tudo ok por aqui!"
-    getPutFunction
-    
-else
+  else
     echo "As pastas de backup, temp, e .enxadahost não existem, serão criadas na sua pasta home dentro da .enxadahost."
-    initialSetupFunction
-fi
+    setup
+  fi
+
+  if [ $opt == "get" ]; then
+    rm -fr "$backupFolder*" 2>&1
+    sftpJob
+    zipFileAndMove
+    exit 0
+  elif [ $opt == "put" ]; then
+    rm -fr "$backupFolder*" 2>&1
+    copyBackupAndUnzip
+    sftpJob
+    exit 0
+  else
+    echo "Opção inválida"
+    main
+  fi
+}
+
+main
