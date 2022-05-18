@@ -1,6 +1,6 @@
 #!/bin/bash
 
-folderTemp=~/.sftp-enxada/temp/
+folderTemp=~/.sftp-enxada/.temp/
 workingFolder=~/.sftp-enxada/
 backupFolder=~/.sftp-enxada/backup/
 
@@ -67,9 +67,9 @@ zipFileAndMoveFunction() {
     echo "Os arquivos foram recebidos, tentando compactar em .zip, o arquivo criado irá se chamar: ${user}.zip, e será enviado para $backupFolder/${user}.zip"
     sleep 3
     cd "$folderTemp"
-    zip -r "${user}".zip "$folderTemp"
+    zip -r "${user}".zip ./*
     mv "$folderTemp${user}.zip" "$backupFolder"
-    rm -r "$folderTemp"
+    rm -r "$folderTemp*"
     echo "Arquivo compactado e enviado para $backupFolder${user}.zip, finalizando..."
     exit 1
 
@@ -97,7 +97,7 @@ connectSftpFunction() {
     elif [[ "$getPut" == "put" ]]; then
 
     printf "%s\n" "put -r ${folderTemp}*" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
-    rm -r "$folderTemp"
+    rm -r "$folderTemp*"
 
     fi
 
@@ -105,7 +105,7 @@ connectSftpFunction() {
 }
 
 
-if [[ -d "$workingFolder" ]]; then
+if [[ -d "$workingFolder" ]] && [[ -d "$folderTemp" ]] && [[ -d "$backupFolder" ]]; then
     echo "As pastas de backup, temp, e .enxadahost já existem, não serão criadas novamente, tudo ok por aqui!"
     getPutFunction
     
