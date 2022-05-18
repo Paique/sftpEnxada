@@ -1,0 +1,73 @@
+#!/bin/bash
+mkdir ~/.sftp-enxada/ >/dev/null 2>&1
+mkdir ~/.sftp-enxada/temp/ >/dev/null 2>&1
+cd ~/.sftp-enxada/temp/
+mkdir ~/backups-enxada/ >/dev/null 2>&1
+
+echo "Digite o node de desino: "
+echo " "
+read node
+
+echo node ${node} selecionado.
+
+echo "Digite o seu user: "
+
+read user
+
+connect() {
+echo "Get ou Put?"
+read getPut
+
+executeScript() {
+
+if [[ "$getPut" == "get" ]]; then
+
+if [[ -f ~/backups-enxada/${user}.zip ]]; then
+
+
+
+echo "Já existe um backup deste servidor armazenado com o nome ${user}.zip"
+echo "Você deseja excluir este, e criar um novo? (s/n)"
+read fileexists
+
+if [[ "$fileexists" == "s" ]]; then
+
+printf 'mget -r *' 'exit' | sftp -P 2022 ${user}@${node}.enxadahost.com
+zip -r ${user}.zip ./*
+mv ./${user}.zip ~/backups-enxada/
+rm -fr *
+
+elif [[ "$fileexists" == n ]]; then
+echo "O arquivo não foi excluído e nenhuma alteração foi realizada, finalizando."
+exit -1
+
+else
+echo "Opção inválida, utilize s (para sim), e n (Para não)."
+executeScript()
+fi
+
+elif [[ "$getPut" == "put" ]]; then
+
+if [[ -f ~/backups-enxada/${user}.zip ]]; then
+
+cp ../backups/${user}.zip ./
+unzip -r ${user}.zip
+rm ${user}.zip
+printf 'mput -r *' 'exit' | sftp -l 150000 -P 2022 ${user}@${node}.enxadahost.com
+else
+echo "Operação inválida, por favor escolha get, ou put (Case sensitive)"
+connect()
+
+else
+echo "O arquivo de backup não foi encontrado, primeiro crie um backup antes de o enviar!"
+exit -1
+fi
+
+fi
+
+}
+
+executeScript()
+}
+
+connect()
