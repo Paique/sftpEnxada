@@ -69,7 +69,7 @@ zipFileAndMoveFunction() {
     cd "$folderTemp"
     zip -r "${user}".zip ./*
     mv "$folderTemp${user}.zip" "$backupFolder"
-    rm -r "$folderTemp*"
+    rm -r *
     echo "Arquivo compactado e enviado para $backupFolder${user}.zip, finalizando..."
     exit 1
 
@@ -97,7 +97,8 @@ connectSftpFunction() {
     elif [[ "$getPut" == "put" ]]; then
 
     printf "%s\n" "put -r ${folderTemp}*" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
-    rm -r "$folderTemp*"
+    cd "$folderTemp"
+    rm -r *
 
     fi
 
