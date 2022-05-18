@@ -1,73 +1,115 @@
 #!/bin/bash
-mkdir ~/.sftp-enxada/ >/dev/null 2>&1
-mkdir ~/.sftp-enxada/temp/ >/dev/null 2>&1
-cd ~/.sftp-enxada/temp/
-mkdir ~/backups-enxada/ >/dev/null 2>&1
 
-echo "Digite o node de desino: "
-echo " "
-read node
+folderTemp=~/.sftp-enxada/temp/
+workingFolder=~/.sftp-enxada/
+backupFolder=~/.sftp-enxada/backup/
 
-echo node ${node} selecionado.
+    read -p "Digite o nome do usuário: " user
+    read -p "Digite o node de destino (Ex: br-arm-7): " host
 
-echo "Digite o seu user: "
+initialSetupFunction() {
 
-read user
+    echo "Iniciando o setup inicial, o sistema de arquivos necessário será criado, uma pasta chamada .sftp-enxada será criada dentro do home do usuário."
+    mkdir $workingFolder
+    mkdir $folderTemp
+    mkdir $backupFolder
+    echo "Setup inicial concluído."
 
-connect() {
-echo "Get ou Put?"
-read getPut
+    getPutFunction
+}
 
-executeScript() {
+getPutFunction() {
+
+    read -p "Escolha get para enviar, e put para receber arquivos do servidor (obs: o get irá compactar o arquivo, e o armazenaremos em $backupFolder, e o put irá descompactar o arquivo e o enviará ao servidor): " getPut
 
 if [[ "$getPut" == "get" ]]; then
-
-if [[ -f ~/backups-enxada/${user}.zip ]]; then
-
-
-
-echo "Já existe um backup deste servidor armazenado com o nome ${user}.zip"
-echo "Você deseja excluir este, e criar um novo? (s/n)"
-read fileexists
-
-if [[ "$fileexists" == "s" ]]; then
-
-printf 'mget -r *' 'exit' | sftp -P 2022 ${user}@${node}.enxadahost.com
-zip -r ${user}.zip ./*
-mv ./${user}.zip ~/backups-enxada/
-rm -fr *
-
-elif [[ "$fileexists" == n ]]; then
-echo "O arquivo não foi excluído e nenhuma alteração foi realizada, finalizando."
-exit -1
-
-else
-echo "Opção inválida, utilize s (para sim), e n (Para não)."
-executeScript()
-fi
+    rm -fr "$backupFolder*" 2>&1
+    connectSftpFunction
+    zipFileAndMoveFunction
+    exit 0
 
 elif [[ "$getPut" == "put" ]]; then
-
-if [[ -f ~/backups-enxada/${user}.zip ]]; then
-
-cp ../backups/${user}.zip ./
-unzip -r ${user}.zip
-rm ${user}.zip
-printf 'mput -r *' 'exit' | sftp -l 150000 -P 2022 ${user}@${node}.enxadahost.com
-else
-echo "Operação inválida, por favor escolha get, ou put (Case sensitive)"
-connect()
+    rm -fr "$backupFolder*" 2>&1
+    copyBackupAndUnzipFunction
+    connectSftpFunction
+    
+    exit 0
 
 else
-echo "O arquivo de backup não foi encontrado, primeiro crie um backup antes de o enviar!"
-exit -1
-fi
+    
+        echo "Opção inválida"
+        getPutFunction
+    
+    fi
+}
 
-fi
+
+zipFileAndMoveFunction() {
+
+
+  if [ -f "$backupFolder/$user.zip" ]; then
+
+    read -p "O arquivo $user.zip já existe, deseja excluir-lo? (s/n): " removeFile
+    if [[ "$removeFile" == "s" ]]; then
+        rm $backupFolder/$user.zip
+        echo "Arquivo $user.zip excluído."
+    elif [[ "$removeFile" == "n" ]]; then
+        echo "Arquivo $user.zip não foi modificado, e nenhum backup foi realizado."
+        exit 0
+    else
+        echo "Opção inválida, utilize 's' para sim ou 'n' para não. (Case sensitive)"
+        zipFileAndMoveFunction
+    fi
+      
+  fi
+  
+
+    echo "Os arquivos foram recebidos, tentando compactar em .zip, o arquivo criado irá se chamar: ${user}.zip, e será enviado para $backupFolder/${user}.zip"
+    sleep 3
+    cd "$folderTemp"
+    zip -r "${user}".zip "$folderTemp"
+    mv "$folderTemp${user}.zip" "$backupFolder"
+    rm -r "$folderTemp"
+    echo "Arquivo compactado e enviado para $backupFolder${user}.zip, finalizando..."
+    exit 1
 
 }
 
-executeScript()
+copyBackupAndUnzipFunction() {
+
+    echo "Descompactando arquivo $backupFolder/${user}.zip, e em $folderTemp para ser enviado novamente ao servidor."
+    sleep 3
+    cp $backupFolder/${user}.zip $folderTemp
+    unzip -r ${user}.zip $folderTemp
+    rm $backupFolder/${user}.zip
+    echo "Arquivo enviado para $backupFolder/${user}.zip, e descompactado iniciando transferência ao servidor."
+    sleep 3
+
 }
 
-connect()
+
+connectSftpFunction() {
+
+    if [[ "$getPut" == "get" ]]; then
+
+    printf "%s\n" "get -r * ${folderTemp}" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
+
+    elif [[ "$getPut" == "put" ]]; then
+
+    printf "%s\n" "put -r ${folderTemp}*" 'exit' | sftp -P 2022 "$user"@"$host".enxadahost.com
+    rm -r "$folderTemp"
+
+    fi
+
+
+}
+
+
+if [[ -d "$workingFolder" ]]; then
+    echo "As pastas de backup, temp, e .enxadahost já existem, não serão criadas novamente, tudo ok por aqui!"
+    getPutFunction
+    
+else
+    echo "As pastas de backup, temp, e .enxadahost não existem, serão criadas na sua pasta home dentro da .enxadahost."
+    initialSetupFunction
+fi
